@@ -20,7 +20,7 @@ train_data = torchvision.datasets.ImageFolder(train_dir, transform=transform)
 test_data = torchvision.datasets.ImageFolder(test_dir, transform=transform)
 
 valid_size = 0.2   # proportion of validation set (80% train, 20% validation)
-batch_size = 32    
+batch_size = 8    
 
 # Define randomly the indices of examples to use for training and for validation
 num_train = len(train_data)
