@@ -1,26 +1,41 @@
 import torch
+import os
+from tqdm import tqdm
 
 class BaseTrainer():
 
-    def __init__(self, model, loss_fn, optimizer, ):
+    def __init__(self, model, loss_fn, optimizer, checkpoints_path=None):
         self.model = model
         self.loss_fn = loss_fn
         self.optimizer = optimizer
+        self.checkpoints_path = os.path.join(checkpoints_path, 'checkpoint')
 
         self.reset_stats()
-    
+
+        if checkpoints_path == None:
+            self.save_checkpoint = False
+        else:
+            self.save_checkpoint = True
+            os.makedirs(self.checkpoints_path, exist_ok=True)
+        
     def fit(self, train_loader, test_loader, epochs, device):
         self.reset_stats()
-        for t in range(epochs):
-            print(f"Epoch {t+1}\n-------------------------------")
-            self.train_loop(train_loader, device)
-            self.test_loop(test_loader, device)
-        print("Done!")
-
-    def train_loop(self, dataloader, device):
-        # make sure the model is in train mode
         self.model.train()
 
+        for t in tqdm(range(epochs)):
+
+            self.train_loop(train_loader, device)
+            self.test_loop(test_loader, device)
+
+            if self.save_checkpoint:
+                torch.save({
+                    'epoch': t,
+                    'model_state_dict': self.model.state_dict(),
+                    'optimizer_state_dict': self.optimizer.state_dict(),
+                    'loss': self.stats['train_loss'][-1]
+                    }, os.path.join(self.checkpoints_path, 'checkpoint_' + str(t) + '.pt'))
+
+    def train_loop(self, dataloader, device):
         size = len(dataloader.dataset)
         num_batches = len(dataloader)
         train_loss, correct = 0, 0
@@ -38,10 +53,6 @@ class BaseTrainer():
             loss.backward()
             self.optimizer.step()
 
-            if batch % 1024 == 0:
-                loss, current = loss.item(), batch * len(X)
-                print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
-
             train_loss += loss.item()
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
 
@@ -51,13 +62,7 @@ class BaseTrainer():
         self.stats['train_loss'].append(train_loss)
         self.stats['train_accuracy'].append(correct)
 
-
-
-
     def test_loop(self, dataloader, device):
-        # make sure the model is in eval mode
-        self.model.eval()
-        
         size = len(dataloader.dataset)
         num_batches = len(dataloader)
         test_loss, correct = 0, 0
@@ -75,8 +80,6 @@ class BaseTrainer():
 
         self.stats['test_loss'].append(test_loss)
         self.stats['test_accuracy'].append(correct)
-
-        print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
     
     def reset_stats(self):
         self.stats = {
