@@ -1,3 +1,4 @@
+from copy import deepcopy
 import torch
 import os
 from tqdm import tqdm
@@ -9,6 +10,11 @@ class BaseTrainer():
         self.loss_fn = loss_fn
         self.optimizer = optimizer
         self.checkpoints_path = os.path.join(checkpoints_path, 'checkpoint')
+
+        self.best_model = None
+        self.best_epoch = None
+        self.best_loss = None
+        self.best_accuracy = 0
 
         self.reset_stats()
 
@@ -26,13 +32,21 @@ class BaseTrainer():
 
             self.train_loop(train_loader, device)
             self.test_loop(test_loader, device)
+            
+
+            if self.stats['test_accuracy'][-1] > self.best_accuracy:
+                self.best_accuracy = self.stats['test_accuracy'][-1]
+                self.best_epoch = t
+                self.best_loss = self.stats['test_loss'][-1]
+                self.best_model = deepcopy(self.model.state_dict())
 
             if self.save_checkpoint:
                 torch.save({
                     'epoch': t,
                     'model_state_dict': self.model.state_dict(),
                     'optimizer_state_dict': self.optimizer.state_dict(),
-                    'loss': self.stats['train_loss'][-1]
+                    'loss': self.stats['train_loss'][-1],
+                    'accuracy' : self.stats['train_accuracy'][-1],
                     }, os.path.join(self.checkpoints_path, 'checkpoint_' + str(t) + '.pt'))
 
     def train_loop(self, dataloader, device):
@@ -91,3 +105,6 @@ class BaseTrainer():
 
     def get_stats(self):
         return self.stats
+
+    def get_best_model(self):
+        return (self.best_epoch, self.best_accuracy, self.best_loss, self.best_model)
