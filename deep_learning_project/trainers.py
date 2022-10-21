@@ -10,13 +10,13 @@ class BaseTrainer():
     def fit(self, train_loader, test_loader, epochs, device):
         for t in range(epochs):
             print(f"Epoch {t+1}\n-------------------------------")
-            self.train_loop(train_loader, self.model, self.loss_fn, self.optimizer, device)
-            self.test_loop(test_loader, self.model, self.loss_fn, device)
+            self.train_loop(train_loader, device)
+            self.test_loop(test_loader, device)
         print("Done!")
 
-    def train_loop(self, dataloader, model, loss_fn, optimizer, device):
+    def train_loop(self, dataloader, device):
         # make sure the model is in train mode
-        model.train()
+        self.model.train()
 
         size = len(dataloader.dataset)
         for batch, (X, y) in enumerate(dataloader):
@@ -24,22 +24,22 @@ class BaseTrainer():
             y = y.to(device)
 
             # Compute prediction and loss
-            pred = model(X)
-            loss = loss_fn(pred, y)
+            pred = self.model(X)
+            loss = self.loss_fn(pred, y)
 
             # Backpropagation
-            optimizer.zero_grad()
+            self.optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
+            self.optimizer.step()
 
             if batch % 1024 == 0:
                 loss, current = loss.item(), batch * len(X)
                 print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
 
-    def test_loop(self, dataloader, model, loss_fn, device):
+    def test_loop(self, dataloader, device):
         # make sure the model is in eval mode
-        model.eval()
+        self.model.eval()
         
         size = len(dataloader.dataset)
         num_batches = len(dataloader)
@@ -49,8 +49,8 @@ class BaseTrainer():
             for X, y in dataloader:
                 X = X.to(device)
                 y = y.to(device)
-                pred = model(X)
-                test_loss += loss_fn(pred, y).item()
+                pred = self.model(X)
+                test_loss += self.loss_fn(pred, y).item()
                 correct += (pred.argmax(1) == y).type(torch.float).sum().item()
 
         test_loss /= num_batches
