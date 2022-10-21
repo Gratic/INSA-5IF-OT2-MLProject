@@ -4,6 +4,7 @@ import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 import os
+from sklearn.model_selection import train_test_split
 
 current_absolute_path = os.path.dirname(__file__)
 
@@ -15,7 +16,7 @@ transform = transforms.Compose(
      transforms.ToTensor(),    # transforms to Torch tensor (needed for PyTorch)
      transforms.Normalize(mean=(0.5,),std=(0.5,))]) # subtracts mean (0.5) and devides by standard deviation (0.5) -> resulting values in (-1, +1)
 
-def load(valid_size = 0.2, batch_size = 8, device = 'cpu'): # proportion of validation set (80% train, 20% validation)
+def basic_load(valid_size = 0.2, batch_size = 32, device = 'cpu'): # proportion of validation set (80% train, 20% validation)
     # Define two pytorch datasets (train/test) 
     train_data = torchvision.datasets.ImageFolder(train_dir, transform=transform)
     test_data = torchvision.datasets.ImageFolder(test_dir, transform=transform)
@@ -45,5 +46,31 @@ def load(valid_size = 0.2, batch_size = 8, device = 'cpu'): # proportion of vali
     # for epoch in range(1, n_epochs+1):  
     #   loop over iterations: one iteration = 1 batch of examples
     #   for data, target in train_loader: 
+
+    return (train_loader, valid_loader, test_loader, classes)
+
+def balanced_load(valid_size = 0.2, batch_size = 32, device = 'cpu'):
+    # Define two pytorch datasets (train/test) 
+    train_data = torchvision.datasets.ImageFolder(train_dir, transform=transform)
+    test_data = torchvision.datasets.ImageFolder(test_dir, transform=transform)
+
+    targets = train_data.targets
+
+    train_idx, valid_idx = train_test_split(np.arange(len(targets)), test_size=valid_size, shuffle=True, stratify=targets)
+
+    print(len(train_idx))
+    print(len(valid_idx))
+
+    # Define two "samplers" that will randomly pick examples from the training and validation set
+    train_sampler = SubsetRandomSampler(train_idx)
+    valid_sampler = SubsetRandomSampler(valid_idx)
+
+    # Dataloaders (take care of loading the data from disk, batch by batch, during training)
+    kwargs = {'num_workers': 4, 'pin_memory': True} if device=='cuda' else {}
+    train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, sampler=train_sampler, **kwargs)
+    valid_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, sampler=valid_sampler, **kwargs)
+    test_loader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, shuffle=True, **kwargs)
+
+    classes = ('noface','face')  # indicates that "1" means "face" and "0" non-face (only used for display)
 
     return (train_loader, valid_loader, test_loader, classes)
