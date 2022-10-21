@@ -28,7 +28,7 @@ class BaseTrainer():
         self.reset_stats()
         self.model.train()
 
-        for t in tqdm(range(epochs)):
+        for t in range(epochs):
 
             self.train_loop(train_loader, device)
             self.test_loop(test_loader, device)
@@ -48,13 +48,22 @@ class BaseTrainer():
                     'loss': self.stats['train_loss'][-1],
                     'accuracy' : self.stats['train_accuracy'][-1],
                     }, os.path.join(self.checkpoints_path, 'checkpoint_' + str(t) + '.pt'))
+            
+            print("epoch {0} of {1}: train_loss: {2:.5f}, train_accuracy: {3:.2%}, test_loss: {4:.5f}, test_accuracy: {5:.2%}"
+                .format(t+1,
+                        epochs,
+                        self.stats['train_loss'][-1],
+                        self.stats['train_accuracy'][-1],
+                        self.stats['test_loss'][-1],
+                        self.stats['test_accuracy'][-1])
+            )
 
     def train_loop(self, dataloader, device):
         size = len(dataloader.dataset)
         num_batches = len(dataloader)
         train_loss, correct = 0, 0
 
-        for batch, (X, y) in enumerate(dataloader):
+        for batch, (X, y) in tqdm(enumerate(dataloader)):
             X = X.to(device)
             y = y.to(device)
 

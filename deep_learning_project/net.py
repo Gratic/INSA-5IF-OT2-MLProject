@@ -1,6 +1,17 @@
+from turtle import forward
 import torch.nn as nn
 import torch.nn.functional as F
 
+
+class LinearRegressionNetwork(nn.Module):
+    def __init__(self):
+        super(LinearRegressionNetwork, self).__init__()
+        self.fc1 = nn.Linear(36*36, 2)
+    
+    def forward(self, x):
+        x = x.view(-1, 36*36)
+        x = self.fc1(x)
+        return x
 
 class FirstNeuralNetwork(nn.Module):
     def __init__(self):
