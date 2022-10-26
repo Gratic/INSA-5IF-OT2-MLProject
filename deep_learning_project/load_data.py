@@ -6,15 +6,18 @@ from torch.utils.data.sampler import SubsetRandomSampler
 import os
 from sklearn.model_selection import train_test_split
 
+def get_transform():
+    return transforms.Compose(
+    [transforms.Grayscale(),   # transforms to gray-scale (1 input channel)
+     transforms.ToTensor(),    # transforms to Torch tensor (needed for PyTorch)
+     transforms.Normalize(mean=(0.5,),std=(0.5,))]) # subtracts mean (0.5) and devides by standard deviation (0.5) -> resulting values in (-1, +1)
+
 current_absolute_path = os.path.dirname(__file__)
 
 train_dir = current_absolute_path + '/train_images'
 test_dir = current_absolute_path + '/test_images'
 
-transform = transforms.Compose(
-    [transforms.Grayscale(),   # transforms to gray-scale (1 input channel)
-     transforms.ToTensor(),    # transforms to Torch tensor (needed for PyTorch)
-     transforms.Normalize(mean=(0.5,),std=(0.5,))]) # subtracts mean (0.5) and devides by standard deviation (0.5) -> resulting values in (-1, +1)
+transform = get_transform()
 
 def basic_load(valid_size = 0.2, batch_size = 32, device = 'cpu'): # proportion of validation set (80% train, 20% validation)
     # Define two pytorch datasets (train/test) 
