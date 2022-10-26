@@ -22,6 +22,11 @@ class BaseTrainer():
         self.best_test_loss = None
         self.best_test_accuracy = 0
 
+        self.train_size = 0
+        self.train_num_batch = 0
+        self.valid_size = 0
+        self.valid_num_batch = 0
+
         self.reset_stats()
 
         if checkpoints_path == None:
@@ -33,6 +38,21 @@ class BaseTrainer():
     def fit(self, train_loader, valid_loader, test_loader, epochs, device):
         self.reset_stats()
         self.model.train()
+
+        # can't rely on dataset size when using a subset sampler
+        self.train_size = 0
+        self.train_num_batch = 0
+        for X,y in train_loader:
+            self.train_size += X.size(dim=0)
+            self.train_num_batch += 1
+        
+        self.valid_size = 0
+        self.valid_num_batch = 0
+        for X, y in valid_loader:
+            self.valid_size += X.size(dim=0)
+            self.valid_num_batch += 1
+
+        print("Size of train dataset={0}, train batches={1}, valid dataset={2}, valid batches={3}".format(self.train_size, self.train_num_batch, self.valid_size, self.valid_num_batch))
 
         for t in range(epochs):
 
@@ -85,8 +105,8 @@ class BaseTrainer():
                             self.stats['test_accuracy'][-1]))
 
     def train_loop(self, dataloader, device):
-        size = len(dataloader.dataset)
-        num_batches = len(dataloader)
+        size = self.train_size
+        num_batches = self.train_num_batch
         train_loss, correct = 0, 0
 
         for batch, (X, y) in tqdm(enumerate(dataloader)):
@@ -111,9 +131,7 @@ class BaseTrainer():
         self.stats['train_loss'].append(train_loss)
         self.stats['train_accuracy'].append(correct)
 
-    def evaluate_model(self, dataloader, device):
-        size = len(dataloader.dataset)
-        num_batches = len(dataloader)
+    def evaluate_model(self, dataloader, size, num_batches, device):
         loss, accuracy = 0, 0
 
         with torch.no_grad():
@@ -131,13 +149,16 @@ class BaseTrainer():
 
 
     def valid_loop(self, dataloader, device):
-        loss, correct = self.evaluate_model(dataloader, device)
+        loss, correct = self.evaluate_model(dataloader, self.valid_size, self.valid_num_batch, device)
 
         self.stats['valid_loss'].append(loss)
         self.stats['valid_accuracy'].append(correct)
     
     def test_loop(self, dataloader, device):
-        loss, correct = self.evaluate_model(dataloader, device)
+        size = len(dataloader.dataset)
+        num_batches = len(dataloader)
+
+        loss, correct = self.evaluate_model(dataloader, size, num_batches, device)
 
         self.stats['test_loss'].append(loss)
         self.stats['test_accuracy'].append(correct)
