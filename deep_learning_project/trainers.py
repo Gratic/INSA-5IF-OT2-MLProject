@@ -72,9 +72,9 @@ class BaseTrainer():
                             self.stats['train_loss'][-1],
                             self.stats['train_accuracy'][-1],
                             self.stats['valid_loss'][-1],
-                            self.stats['valid_accuracy'][-1])
+                            self.stats['valid_accuracy'][-1]))
             else:
-                print("epoch {0} of {1}: train_loss: {2:.5f}, train_accuracy: {3:.2%}, valid_loss: {4:.5f}, valid_accuracy: {5:.2%}, test_loss: {4:.5f}, test_accuracy: {5:.2%}"
+                print("epoch {0} of {1}: train_loss: {2:.5f}, train_accuracy: {3:.2%}, valid_loss: {4:.5f}, valid_accuracy: {5:.2%}, test_loss: {6:.5f}, test_accuracy: {7:.2%}"
                     .format(t+1,
                             epochs,
                             self.stats['train_loss'][-1],
@@ -82,9 +82,7 @@ class BaseTrainer():
                             self.stats['valid_loss'][-1],
                             self.stats['valid_accuracy'][-1],
                             self.stats['test_loss'][-1],
-                            self.stats['test_accuracy'][-1])
-
-            )
+                            self.stats['test_accuracy'][-1]))
 
     def train_loop(self, dataloader, device):
         size = len(dataloader.dataset)
