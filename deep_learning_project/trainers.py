@@ -57,52 +57,54 @@ class BaseTrainer():
         for t in range(epochs):
 
             self.train_loop(train_loader, device)
-            self.valid_loop(valid_loader, device)
-
-            if test_loader != None:
-                self.test_loop(test_loader, device)
             
+            with torch.no_grad():
+                self.valid_loop(valid_loader, device)
 
-            if self.stats['valid_accuracy'][-1] > self.best_valid_accuracy:
-                self.best_valid_accuracy = self.stats['valid_accuracy'][-1]
-                self.best_valid_epoch = t
-                self.best_valid_loss = self.stats['valid_loss'][-1]
-                self.best_valid_model = deepcopy(self.model.state_dict())
-            
-            if test_loader != None:
-                if self.stats['test_accuracy'][-1] > self.best_test_accuracy:
-                    self.best_test_accuracy = self.stats['test_accuracy'][-1]
-                    self.best_test_epoch = t
-                    self.best_test_loss = self.stats['test_loss'][-1]
-                    self.best_test_model = deepcopy(self.model.state_dict())
+                if test_loader != None:
+                    self.test_loop(test_loader, device)
+                
 
-            if self.save_checkpoint:
-                torch.save({
-                    'epoch': t,
-                    'model_state_dict': self.model.state_dict(),
-                    'optimizer_state_dict': self.optimizer.state_dict(),
-                    'loss': self.stats['train_loss'][-1],
-                    'accuracy' : self.stats['train_accuracy'][-1],
-                    }, os.path.join(self.checkpoints_path, 'checkpoint_' + str(t) + '.pt'))
-            
-            if test_loader == None:
-                print("epoch {0} of {1}: train_loss: {2:.5f}, train_accuracy: {3:.2%}, valid_loss: {4:.5f}, valid_accuracy: {5:.2%}"
-                    .format(t+1,
-                            epochs,
-                            self.stats['train_loss'][-1],
-                            self.stats['train_accuracy'][-1],
-                            self.stats['valid_loss'][-1],
-                            self.stats['valid_accuracy'][-1]))
-            else:
-                print("epoch {0} of {1}: train_loss: {2:.5f}, train_accuracy: {3:.2%}, valid_loss: {4:.5f}, valid_accuracy: {5:.2%}, test_loss: {6:.5f}, test_accuracy: {7:.2%}"
-                    .format(t+1,
-                            epochs,
-                            self.stats['train_loss'][-1],
-                            self.stats['train_accuracy'][-1],
-                            self.stats['valid_loss'][-1],
-                            self.stats['valid_accuracy'][-1],
-                            self.stats['test_loss'][-1],
-                            self.stats['test_accuracy'][-1]))
+                if self.stats['valid_accuracy'][-1] > self.best_valid_accuracy:
+                    self.best_valid_accuracy = self.stats['valid_accuracy'][-1]
+                    self.best_valid_epoch = t
+                    self.best_valid_loss = self.stats['valid_loss'][-1]
+                    self.best_valid_model = deepcopy(self.model.state_dict())
+                
+                if test_loader != None:
+                    if self.stats['test_accuracy'][-1] > self.best_test_accuracy:
+                        self.best_test_accuracy = self.stats['test_accuracy'][-1]
+                        self.best_test_epoch = t
+                        self.best_test_loss = self.stats['test_loss'][-1]
+                        self.best_test_model = deepcopy(self.model.state_dict())
+
+                if self.save_checkpoint:
+                    torch.save({
+                        'epoch': t,
+                        'model_state_dict': self.model.state_dict(),
+                        'optimizer_state_dict': self.optimizer.state_dict(),
+                        'loss': self.stats['train_loss'][-1],
+                        'accuracy' : self.stats['train_accuracy'][-1],
+                        }, os.path.join(self.checkpoints_path, 'checkpoint_' + str(t) + '.pt'))
+                
+                if test_loader == None:
+                    print("epoch {0} of {1}: train_loss: {2:.5f}, train_accuracy: {3:.2%}, valid_loss: {4:.5f}, valid_accuracy: {5:.2%}"
+                        .format(t+1,
+                                epochs,
+                                self.stats['train_loss'][-1],
+                                self.stats['train_accuracy'][-1],
+                                self.stats['valid_loss'][-1],
+                                self.stats['valid_accuracy'][-1]))
+                else:
+                    print("epoch {0} of {1}: train_loss: {2:.5f}, train_accuracy: {3:.2%}, valid_loss: {4:.5f}, valid_accuracy: {5:.2%}, test_loss: {6:.5f}, test_accuracy: {7:.2%}"
+                        .format(t+1,
+                                epochs,
+                                self.stats['train_loss'][-1],
+                                self.stats['train_accuracy'][-1],
+                                self.stats['valid_loss'][-1],
+                                self.stats['valid_accuracy'][-1],
+                                self.stats['test_loss'][-1],
+                                self.stats['test_accuracy'][-1]))
 
     def train_loop(self, dataloader, device):
         size = self.train_size
