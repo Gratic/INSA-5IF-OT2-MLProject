@@ -4,6 +4,40 @@ import torch
 import os
 from tqdm import tqdm
 
+class ModelStats():
+    def __init__(self):
+        self.reset()
+    
+    def reset(self):
+        self.best_model = None
+        self.best_epoch = None
+        self.best_loss = None
+        self.best_accuracy = 0
+
+        self.losses = []
+        self.accuracies = []
+    
+    def add(self, epoch, model, loss, accuracy):
+        self.losses.append(loss)
+        self.accuracies.append(accuracy)
+
+        if(accuracy > self.best_accuracy):
+            self.best_model = deepcopy(model)
+            self.best_epoch = epoch
+            self.best_loss = loss
+            self.best_accuracy = accuracy
+    
+    def get_stats(self):
+        return {
+            "best_epoch": self.best_epoch,
+            "best_loss": self.best_loss,
+            "best_accuracy": self.best_accuracy,
+            "losses": self.losses,
+            "accuracies": self.accuracies
+        }
+    
+    def get_best_model(self):
+        return self.best_model
 class BaseTrainer():
 
     def __init__(self, model, loss_fn, optimizer, checkpoints_path=None):
@@ -12,22 +46,23 @@ class BaseTrainer():
         self.optimizer = optimizer
         self.checkpoints_path = os.path.join(checkpoints_path, 'checkpoint')
 
-        self.best_valid_model = None
-        self.best_valid_epoch = None
-        self.best_valid_loss = None
-        self.best_valid_accuracy = 0
-
-        self.best_test_model = None
-        self.best_test_epoch = None
-        self.best_test_loss = None
-        self.best_test_accuracy = 0
+        self.stats = {}
+        self.stats['train'] = ModelStats()
+        self.stats['valid'] = ModelStats()
+        self.stats['test'] = ModelStats()
 
         self.train_size = 0
         self.train_num_batch = 0
         self.valid_size = 0
         self.valid_num_batch = 0
+        self.test_size = 0
+        self.test_num_batch = 0
 
-        self.reset_stats()
+        self.current_epoch = 0
+        self.max_epoch = None
+        self.device = None
+
+        self._reset_stats()
 
         if checkpoints_path == None:
             self.save_checkpoint = False
@@ -36,80 +71,72 @@ class BaseTrainer():
             os.makedirs(self.checkpoints_path, exist_ok=True)
         
     def fit(self, train_loader, valid_loader, test_loader, epochs, device):
-        self.reset_stats()
+        self._reset_stats()
         self.model.train()
+        torch.backends.cudnn.benchmark = True
+        self.current_epoch = 0
+        self.max_epoch = epochs
+        self.device = device
 
         # can't rely on dataset size when using a subset sampler
-        self.train_size = 0
-        self.train_num_batch = 0
-        for X,y in train_loader:
-            self.train_size += X.size(dim=0)
-            self.train_num_batch += 1
-        
-        self.valid_size = 0
-        self.valid_num_batch = 0
-        for X, y in valid_loader:
-            self.valid_size += X.size(dim=0)
-            self.valid_num_batch += 1
-
-        print("Size of train dataset={0}, train batches={1}, valid dataset={2}, valid batches={3}".format(self.train_size, self.train_num_batch, self.valid_size, self.valid_num_batch))
+        self._count_data_from_all_loaders_and_load_to_device(train_loader, valid_loader, test_loader)
+        print("Size of train dataset={0}, train batches={1}, valid dataset={2}, valid batches={3}, test dataset={4}, test batches={5}".format(self.train_size, self.train_num_batch, self.valid_size, self.valid_num_batch, self.test_size, self.test_num_batch))
 
         for t in range(epochs):
-
-            self.train_loop(train_loader, device)
+            self._train_loop(train_loader, device)
             
             with torch.no_grad():
-                self.valid_loop(valid_loader, device)
+                self._valid_loop(valid_loader, device)
+                self._test_loop(test_loader, device)
 
-                if test_loader != None:
-                    self.test_loop(test_loader, device)
-                
+            if self.save_checkpoint:
+                torch.save({
+                    'epoch': t,
+                    'model_state_dict': self.model.state_dict(),
+                    'optimizer_state_dict': self.optimizer.state_dict(),
+                    'loss': self.stats['train'].losses[-1],
+                    'accuracy' : self.stats['train'].accuracies[-1],
+                    }, os.path.join(self.checkpoints_path, 'checkpoint_' + str(t) + '.pt'))
+            
+            self._print_evaluation(valid_loader, test_loader)
 
-                if self.stats['valid_accuracy'][-1] > self.best_valid_accuracy:
-                    self.best_valid_accuracy = self.stats['valid_accuracy'][-1]
-                    self.best_valid_epoch = t
-                    self.best_valid_loss = self.stats['valid_loss'][-1]
-                    self.best_valid_model = deepcopy(self.model.state_dict())
-                
-                if test_loader != None:
-                    if self.stats['test_accuracy'][-1] > self.best_test_accuracy:
-                        self.best_test_accuracy = self.stats['test_accuracy'][-1]
-                        self.best_test_epoch = t
-                        self.best_test_loss = self.stats['test_loss'][-1]
-                        self.best_test_model = deepcopy(self.model.state_dict())
+        torch.backends.cudnn.benchmark = False
 
-                if self.save_checkpoint:
-                    torch.save({
-                        'epoch': t,
-                        'model_state_dict': self.model.state_dict(),
-                        'optimizer_state_dict': self.optimizer.state_dict(),
-                        'loss': self.stats['train_loss'][-1],
-                        'accuracy' : self.stats['train_accuracy'][-1],
-                        }, os.path.join(self.checkpoints_path, 'checkpoint_' + str(t) + '.pt'))
-                
-                if test_loader == None:
-                    print("epoch {0} of {1}: train_loss: {2:.5f}, train_accuracy: {3:.2%}, valid_loss: {4:.5f}, valid_accuracy: {5:.2%}"
-                        .format(t+1,
-                                epochs,
-                                self.stats['train_loss'][-1],
-                                self.stats['train_accuracy'][-1],
-                                self.stats['valid_loss'][-1],
-                                self.stats['valid_accuracy'][-1]))
-                else:
-                    print("epoch {0} of {1}: train_loss: {2:.5f}, train_accuracy: {3:.2%}, valid_loss: {4:.5f}, valid_accuracy: {5:.2%}, test_loss: {6:.5f}, test_accuracy: {7:.2%}"
-                        .format(t+1,
-                                epochs,
-                                self.stats['train_loss'][-1],
-                                self.stats['train_accuracy'][-1],
-                                self.stats['valid_loss'][-1],
-                                self.stats['valid_accuracy'][-1],
-                                self.stats['test_loss'][-1],
-                                self.stats['test_accuracy'][-1]))
+    def _print_evaluation(self, valid_loader, test_loader):
+        message = "epoch {0} of {1} : train_loss: {2:.5f}, train_accuracy: {3:.2%}".format(self.current_epoch + 1, self.max_epoch, self.stats['train'].losses[-1], self.stats['train'].accuracies[-1])
 
-    def train_loop(self, dataloader, device):
+        if valid_loader != None:
+            message += ", valid_loss: {0:.5f}, valid_accuracy: {1:.2%}".format(self.stats['valid'].losses[-1], self.stats['valid'].accuracies[-1])
+        
+        if test_loader != None:
+            message += ", test_loss: {0:.5f}, test_accuracy: {1:.2%}".format(self.stats['test'].losses[-1], self.stats['test'].accuracies[-1])
+        
+        print(message)
+
+    def _count_data_from_loader_and_load_to_device(self, loader):
+        n = 0
+        nbatch = 0
+        for X, y in loader:
+            n += X.size(dim=0)
+            nbatch += 1
+            X.to(self.device)
+            y.to(self.device)
+        return (n, nbatch)
+
+    def _count_data_from_all_loaders_and_load_to_device(self, train_loader, valid_loader, test_loader):
+        if train_loader != None:
+            (self.train_size, self.train_num_batch) = self._count_data_from_loader_and_load_to_device(train_loader)
+        
+        if valid_loader != None:
+            (self.valid_size, self.valid_num_batch) = self._count_data_from_loader_and_load_to_device(valid_loader)
+        
+        if test_loader != None:
+            (self.test_size, self.test_num_batch) = self._count_data_from_loader_and_load_to_device(test_loader)
+
+    def _train_loop(self, dataloader, device):
         size = self.train_size
         num_batches = self.train_num_batch
-        train_loss, correct = 0, 0
+        train_loss, accuracy = 0, 0
 
         for batch, (X, y) in tqdm(enumerate(dataloader)):
             X = X.to(device)
@@ -125,15 +152,14 @@ class BaseTrainer():
             self.optimizer.step()
 
             train_loss += loss.item()
-            correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+            accuracy += (pred.argmax(1) == y).type(torch.float).sum().item()
 
         train_loss /= num_batches
-        correct /= size
+        accuracy /= size
 
-        self.stats['train_loss'].append(train_loss)
-        self.stats['train_accuracy'].append(correct)
+        self.stats['train'].add(self.current_epoch, self.model, train_loss, accuracy)
 
-    def evaluate_model(self, dataloader, size, num_batches, device):
+    def _evaluate_model(self, dataloader, size, num_batches, device):
         loss, accuracy = 0, 0
 
         with torch.no_grad():
@@ -150,48 +176,37 @@ class BaseTrainer():
         return (loss, accuracy)
 
 
-    def valid_loop(self, dataloader, device):
-        loss, correct = self.evaluate_model(dataloader, self.valid_size, self.valid_num_batch, device)
+    def _valid_loop(self, dataloader, device):
+        if dataloader == None:
+            return
 
-        self.stats['valid_loss'].append(loss)
-        self.stats['valid_accuracy'].append(correct)
+        loss, accuracy = self._evaluate_model(dataloader, self.valid_size, self.valid_num_batch, device)
+
+        self.stats['valid'].add(self.current_epoch, self.model, loss, accuracy)
     
-    def test_loop(self, dataloader, device):
+    def _test_loop(self, dataloader, device):
+        if dataloader == None:
+            return
+
         size = len(dataloader.dataset)
         num_batches = len(dataloader)
 
-        loss, correct = self.evaluate_model(dataloader, size, num_batches, device)
+        loss, accuracy = self._evaluate_model(dataloader, size, num_batches, device)
 
-        self.stats['test_loss'].append(loss)
-        self.stats['test_accuracy'].append(correct)
+        self.stats['test'].add(self.current_epoch, self.model, loss, accuracy)
     
-    def reset_stats(self):
-        self.stats = {
-            "train_loss": [],
-            "train_accuracy": [],
-            "valid_loss": [],
-            "valid_accuracy": [],
-            "test_loss": [],
-            "test_accuracy": [],
-            }
+    def _reset_stats(self):
+        for stat in self.stats.values():
+            stat.reset()
 
     def get_stats(self):
-        return self.stats
+        obj = {}
+        for k, v in self.stats:
+            obj[k] = v.get_stats()
+        return obj
 
-    def get_best_model(self):
-        return { 
-                    "valid":
-                    {
-                        "epoch": self.best_valid_epoch,
-                        "accuracy": self.best_valid_accuracy,
-                        "loss": self.best_valid_loss,
-                        "model": self.best_valid_model
-                    },
-                    "test":
-                    {
-                        "epoch": self.best_test_epoch,
-                        "accuracy": self.best_test_accuracy,
-                        "loss": self.best_test_loss,
-                        "model": self.best_test_model
-                    }
-                }
+    def get_best_models(self):
+        obj = {}
+        for k, v in self.stats:
+            obj[k] = v.get_best_model()
+        return obj
