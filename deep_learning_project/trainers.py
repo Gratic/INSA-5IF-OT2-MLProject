@@ -1,16 +1,17 @@
 from pure_eval import Evaluator
 import torch
 import os
-from tqdm import tqdm
 from .utils import ModelStats
+from ray import tune
+from ray.air import session, Checkpoint
+from tqdm import tqdm
 
 class BaseTrainer():
 
-    def __init__(self, model, loss_fn, optimizer, checkpoints_path=None):
+    def __init__(self, model, loss_fn, optimizer, checkpoints_path=None, tunning=False):
         self.model = model
         self.loss_fn = loss_fn
         self.optimizer = optimizer
-        self.checkpoints_path = os.path.join(checkpoints_path, 'checkpoints')
 
         self.stats = {}
         self.stats['train'] = ModelStats()
@@ -28,12 +29,15 @@ class BaseTrainer():
         self.max_epoch = None
         self.device = None
 
+        self.tunning = tunning
+
         self._reset_stats()
 
         if checkpoints_path == None:
             self.save_checkpoint = False
         else:
             self.save_checkpoint = True
+            self.checkpoints_path = os.path.join(checkpoints_path, 'checkpoints')
             os.makedirs(self.checkpoints_path, exist_ok=True)
         
     def fit(self, train_loader, valid_loader, test_loader, epochs, device):
@@ -48,23 +52,40 @@ class BaseTrainer():
         self._count_data_from_all_loaders_and_load_to_device(train_loader, valid_loader, test_loader)
         print("Size of train dataset={0}, train batches={1}, valid dataset={2}, valid batches={3}, test dataset={4}, test batches={5}".format(self.train_size, self.train_num_batch, self.valid_size, self.valid_num_batch, self.test_size, self.test_num_batch))
 
+        if session.get_checkpoint():
+            loaded_checkpoint = session.get_checkpoint()
+            with loaded_checkpoint.as_directory() as loaded_checkpoint_dir:
+                path = os.path.join(loaded_checkpoint_dir, "checkpoint.pt")
+                checkpoint = torch.load(path)
+                self.model.load_state_dict(checkpoint["model_state_dict"])
+                self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+                self.current_epoch = checkpoint["epoch"]
+
         for t in range(epochs):
             self._train_loop(train_loader, device)
             
             with torch.no_grad():
                 self._valid_loop(valid_loader, device)
                 self._test_loop(test_loader, device)
+            
+            checkpoint = {
+                'epoch': t,
+                'model_state_dict': self.model.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
+                'loss': self.stats['train'].losses[-1],
+                'accuracy' : self.stats['train'].accuracies[-1],
+                }
+
+            if self.tunning:
+                # torch.save(checkpoint, os.path.join(self.checkpoints_path, 'checkpoint.pt'))
+                session.report({"loss":self.stats['valid'].losses[-1], "accuracy":self.stats['valid'].accuracies[-1]})
+                # session.report({"loss":self.stats['valid'].losses[-1], "accuracy":self.stats['valid'].accuracies[-1]}, checkpoint=Checkpoint.from_directory(self.checkpoints_path))
 
             if self.save_checkpoint:
-                torch.save({
-                    'epoch': t,
-                    'model_state_dict': self.model.state_dict(),
-                    'optimizer_state_dict': self.optimizer.state_dict(),
-                    'loss': self.stats['train'].losses[-1],
-                    'accuracy' : self.stats['train'].accuracies[-1],
-                    }, os.path.join(self.checkpoints_path, 'checkpoint_' + str(t) + '.pt'))
+                torch.save(checkpoint, os.path.join(self.checkpoints_path, 'checkpoint_' + str(t) + '.pt'))
             
-            self._print_evaluation(valid_loader, test_loader)
+            if not self.tunning:
+                self._print_evaluation(valid_loader, test_loader)
             self.current_epoch += 1
 
         torch.backends.cudnn.benchmark = False
@@ -105,7 +126,7 @@ class BaseTrainer():
         num_batches = self.train_num_batch
         train_loss, accuracy = 0, 0
 
-        for batch, (X, y) in tqdm(enumerate(dataloader)):
+        for batch, (X, y) in tqdm(enumerate(dataloader), disable=self.tunning):
             X = X.to(device)
             y = y.to(device)
 
