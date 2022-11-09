@@ -36,7 +36,8 @@ def basic_load(valid_size = 0.2, batch_size = 32, device = 'cpu'): # proportion 
     valid_sampler = SubsetRandomSampler(valid_idx)
 
     # Dataloaders (take care of loading the data from disk, batch by batch, during training)
-    kwargs = {'num_workers': 4, 'pin_memory': True} if device=='cuda' else {}
+    kwargs = {'num_workers': 4, 'pin_memory': True} if 'cuda' in device else {}
+    print(kwargs)
     train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, sampler=train_sampler, **kwargs)
     valid_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, sampler=valid_sampler, **kwargs)
     test_loader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, shuffle=True, **kwargs)

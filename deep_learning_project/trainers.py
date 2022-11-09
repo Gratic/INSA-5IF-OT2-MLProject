@@ -1,50 +1,16 @@
-from copy import deepcopy
 from pure_eval import Evaluator
 import torch
 import os
 from tqdm import tqdm
+from .utils import ModelStats
 
-class ModelStats():
-    def __init__(self):
-        self.reset()
-    
-    def reset(self):
-        self.best_model = None
-        self.best_epoch = None
-        self.best_loss = None
-        self.best_accuracy = 0
-
-        self.losses = []
-        self.accuracies = []
-    
-    def add(self, epoch, model, loss, accuracy):
-        self.losses.append(loss)
-        self.accuracies.append(accuracy)
-
-        if(accuracy > self.best_accuracy):
-            self.best_model = deepcopy(model)
-            self.best_epoch = epoch
-            self.best_loss = loss
-            self.best_accuracy = accuracy
-    
-    def get_stats(self):
-        return {
-            "best_epoch": self.best_epoch,
-            "best_loss": self.best_loss,
-            "best_accuracy": self.best_accuracy,
-            "losses": self.losses,
-            "accuracies": self.accuracies
-        }
-    
-    def get_best_model(self):
-        return self.best_model
 class BaseTrainer():
 
     def __init__(self, model, loss_fn, optimizer, checkpoints_path=None):
         self.model = model
         self.loss_fn = loss_fn
         self.optimizer = optimizer
-        self.checkpoints_path = os.path.join(checkpoints_path, 'checkpoint')
+        self.checkpoints_path = os.path.join(checkpoints_path, 'checkpoints')
 
         self.stats = {}
         self.stats['train'] = ModelStats()
@@ -201,12 +167,12 @@ class BaseTrainer():
 
     def get_stats(self):
         obj = {}
-        for k, v in self.stats:
-            obj[k] = v.get_stats()
+        for k in self.stats:
+            obj[k] = self.stats[k].get_stats()
         return obj
 
     def get_best_models(self):
         obj = {}
-        for k, v in self.stats:
-            obj[k] = v.get_best_model()
+        for k in self.stats:
+            obj[k] = self.stats[k].get_best_model()
         return obj
