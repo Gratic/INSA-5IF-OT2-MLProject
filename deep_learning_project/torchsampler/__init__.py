@@ -17,7 +17,7 @@ if __LIGHTNING_SETUP__:
     import sys
     sys.stderr.write('Partial import during the build process.\n')
 else:
-    from torchsampler.imbalanced import ImbalancedDatasetSampler
+    from .imbalanced import ImbalancedDatasetSampler
 
     __all__ = [
         'ImbalancedDatasetSampler',

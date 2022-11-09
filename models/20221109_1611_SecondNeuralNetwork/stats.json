@@ -1,0 +1,48 @@
+{
+    "device": "cuda:0",
+    "network": "SecondNeuralNetwork",
+    "epochs_number": 1,
+    "learning_rate": 0.01,
+    "batch_size": 32,
+    "train_len_data": 91720,
+    "test_len_data": 7628,
+    "trainer": "BaseTrainer",
+    "optimizer": "SGD",
+    "pytorch_version": "1.12.1+cu116",
+    "loss_function": "CrossEntropyLoss",
+    "performances": {
+        "train": {
+            "best_epoch": 0,
+            "best_loss": 0.23600155036454568,
+            "best_accuracy": 0.9003897732228522,
+            "losses": [
+                0.23600155036454568
+            ],
+            "accuracies": [
+                0.9003897732228522
+            ]
+        },
+        "valid": {
+            "best_epoch": 0,
+            "best_loss": 0.1481769821291809,
+            "best_accuracy": 0.943632795464457,
+            "losses": [
+                0.1481769821291809
+            ],
+            "accuracies": [
+                0.943632795464457
+            ]
+        },
+        "test": {
+            "best_epoch": 0,
+            "best_loss": 0.6843850586897495,
+            "best_accuracy": 0.8961719979024646,
+            "losses": [
+                0.6843850586897495
+            ],
+            "accuracies": [
+                0.8961719979024646
+            ]
+        }
+    }
+}

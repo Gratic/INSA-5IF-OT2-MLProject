@@ -65,6 +65,7 @@ class BaseTrainer():
                     }, os.path.join(self.checkpoints_path, 'checkpoint_' + str(t) + '.pt'))
             
             self._print_evaluation(valid_loader, test_loader)
+            self.current_epoch += 1
 
         torch.backends.cudnn.benchmark = False
 
