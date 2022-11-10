@@ -44,7 +44,7 @@ def trainable(config):
 
     loss_fn = nn.CrossEntropyLoss()
 
-    model = LinearRegressionNetwork()
+    model = FirstNeuralNetwork()
     if parallel:
         model = nn.DataParallel(model)
     model.to(device)
@@ -66,7 +66,7 @@ def trainable(config):
 
 config = {
     "batch_size": tune.choice([32, 64, 128]),
-    "lr": tune.choice([0.1, 0.01, 0.001, 0.0001]),
+    "lr": tune.choice([0.1, 0.01, 0.001, 0.0001, 0.00001]),
     "optim": tune.choice([0, 1, 2]),
     "momentum": tune.choice([0, 0.99, 0.90]),
     "weight_decay": tune.choice([0, 0.01, 0.05, 0.1]),
@@ -86,7 +86,7 @@ tuner = tune.Tuner(
                 metric="loss",
                 mode="min",
                 scheduler=scheduler,
-                num_samples=30,
+                num_samples=50,
             ),
             param_space=config)
 

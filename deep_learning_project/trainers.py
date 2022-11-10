@@ -52,7 +52,7 @@ class BaseTrainer():
         self._count_data_from_all_loaders_and_load_to_device(train_loader, valid_loader, test_loader)
         print("Size of train dataset={0}, train batches={1}, valid dataset={2}, valid batches={3}, test dataset={4}, test batches={5}".format(self.train_size, self.train_num_batch, self.valid_size, self.valid_num_batch, self.test_size, self.test_num_batch))
 
-        if session.get_checkpoint():
+        if self.tunning and session.get_checkpoint():
             loaded_checkpoint = session.get_checkpoint()
             with loaded_checkpoint.as_directory() as loaded_checkpoint_dir:
                 path = os.path.join(loaded_checkpoint_dir, "checkpoint.pt")
