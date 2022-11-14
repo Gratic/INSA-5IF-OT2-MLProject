@@ -18,7 +18,15 @@ def get_transform():
 def get_augmented_transform():
     return transforms.Compose(
     [transforms.RandomHorizontalFlip(),
-     transforms.RandomVerticalFlip(),
+     transforms.RandomRotation(degrees=(0, 359)),
+     ])
+
+def get_both_transform():
+    return transforms.Compose(
+    [transforms.Grayscale(),   # transforms to gray-scale (1 input channel)
+     transforms.ToTensor(),    # transforms to Torch tensor (needed for PyTorch)
+     transforms.Normalize(mean=(0.5,),std=(0.5,)), # subtracts mean (0.5) and devides by standard deviation (0.5) -> resulting values in (-1, +1)
+     transforms.RandomHorizontalFlip(),
      transforms.RandomRotation(degrees=(0, 359)),
      ]) # subtracts mean (0.5) and devides by standard deviation (0.5) -> resulting values in (-1, +1)
 
@@ -29,6 +37,7 @@ test_dir = current_absolute_path + '/test_images'
 
 transform = get_transform()
 transform_augment = get_augmented_transform()
+both_transform = get_both_transform()
 
 def basic_load(valid_size = 0.2, batch_size = 32, device = 'cpu'): # proportion of validation set (80% train, 20% validation)
     # Define two pytorch datasets (train/test) 
@@ -66,7 +75,7 @@ def basic_load(valid_size = 0.2, batch_size = 32, device = 'cpu'): # proportion 
 
 def imbalanced_load(valid_size = 0.2, batch_size = 32, device = 'cpu'): # proportion of validation set (80% train, 20% validation)
     # Define two pytorch datasets (train/test) 
-    train_data = AugmentFacesDataset(train_dir, transform=transform, transform_augment=transform_augment)
+    train_data = torchvision.datasets.ImageFolder(train_dir, transform=both_transform)
     test_data = torchvision.datasets.ImageFolder(test_dir, transform=transform)
 
     # Define randomly the indices of examples to use for training and for validation
@@ -89,7 +98,7 @@ def imbalanced_load(valid_size = 0.2, batch_size = 32, device = 'cpu'): # propor
 
     classes = ('noface','face')  # indicates that "1" means "face" and "0" non-face (only used for display)
 
-    return (train_loader, valid_loader, test_loader, classes)
+    return (train_loader, valid_loader, test_loader, classes, train_data, train_new_idx)
 
 def balanced_load(valid_size = 0.2, batch_size = 32, device = 'cpu'):
     # Define two pytorch datasets (train/test) 

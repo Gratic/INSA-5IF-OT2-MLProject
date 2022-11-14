@@ -2,3 +2,6 @@ test_images/*
 train_images/*
 __pycache__/*
 torchsampler/__pycache__/*
+texturesfp/*
+texturesfp/0/*
+textures/*
