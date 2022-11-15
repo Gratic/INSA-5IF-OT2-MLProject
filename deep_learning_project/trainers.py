@@ -43,7 +43,6 @@ class BaseTrainer():
     def fit(self, train_loader, valid_loader=None, test_loader=None, min_epochs=None, max_epochs=10, early_stopping=None, device='cpu', verbose=True):
         self.model.train()
         torch.backends.cudnn.benchmark = True
-        self.current_epoch = 0
         self.max_epochs = max_epochs
         self.min_epochs = min_epochs
         self.early_stopping = early_stopping
