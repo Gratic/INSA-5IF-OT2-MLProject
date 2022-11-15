@@ -61,7 +61,7 @@ def trainable(config):
     trainer.fit(train_loader=train_loader,
                 valid_loader=valid_loader,
                 test_loader=test_loader,
-                epochs=epochs,
+                max_epochs=epochs,
                 device=device)
 
 config = {

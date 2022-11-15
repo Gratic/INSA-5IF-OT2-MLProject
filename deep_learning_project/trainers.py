@@ -26,7 +26,7 @@ class BaseTrainer():
         self.test_num_batch = 0
 
         self.current_epoch = 0
-        self.max_epoch = None
+        self.max_epochs = None
         self.device = None
 
         self.tunning = tunning
@@ -40,12 +40,19 @@ class BaseTrainer():
             self.checkpoints_path = os.path.join(checkpoints_path, 'checkpoints')
             os.makedirs(self.checkpoints_path, exist_ok=True)
         
-    def fit(self, train_loader, valid_loader, test_loader, epochs, device, verbose=True):
+    def fit(self, train_loader, valid_loader, test_loader, min_epochs=None, max_epochs=10, device='cpu', verbose=True):
         self.model.train()
         torch.backends.cudnn.benchmark = True
         self.current_epoch = 0
-        self.max_epoch = epochs
+        self.max_epochs = max_epochs
+        self.min_epochs = min_epochs
         self.device = device
+        
+        last_checkpoint = None
+
+        early_stopping = False
+        if self.min_epochs != None:
+            early_stopping = True
 
         # can't rely on dataset size when using a subset sampler
         self._count_data_from_all_loaders_and_load_to_device(train_loader, valid_loader, test_loader)
@@ -60,7 +67,7 @@ class BaseTrainer():
                 self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
                 self.current_epoch = checkpoint["epoch"]
 
-        for t in range(epochs):
+        for t in range(max_epochs):
             self._train_loop(train_loader, device)
             
             with torch.no_grad():
@@ -80,17 +87,22 @@ class BaseTrainer():
                 session.report({"loss":self.stats['valid'].losses[-1], "accuracy":self.stats['valid'].accuracies[-1]})
                 # session.report({"loss":self.stats['valid'].losses[-1], "accuracy":self.stats['valid'].accuracies[-1]}, checkpoint=Checkpoint.from_directory(self.checkpoints_path))
 
-            if self.save_checkpoint:
-                torch.save(checkpoint, os.path.join(self.checkpoints_path, 'checkpoint_' + str(t) + '.pt'))
-            
             if not self.tunning or verbose:
                 self._print_evaluation(valid_loader, test_loader)
+
+            if early_stopping and self.stats['valid'].losses[-1] > self.stats['valid'].best_loss:
+                self.pop_back_stats()
+                break
+            elif self.save_checkpoint:
+                last_checkpoint = 'checkpoint_' + str(t) + '.pt'
+                torch.save(checkpoint, os.path.join(self.checkpoints_path, last_checkpoint))
+            
             self.current_epoch += 1
 
         torch.backends.cudnn.benchmark = False
 
     def _print_evaluation(self, valid_loader, test_loader):
-        message = "epoch {0} of {1} : train_loss: {2:.5f}, train_accuracy: {3:.2%}".format(self.current_epoch + 1, self.max_epoch, self.stats['train'].losses[-1], self.stats['train'].accuracies[-1])
+        message = "epoch {0} of {1} : train_loss: {2:.5f}, train_accuracy: {3:.2%}".format(self.current_epoch + 1, self.max_epochs, self.stats['train'].losses[-1], self.stats['train'].accuracies[-1])
 
         if valid_loader != None:
             message += ", valid_loss: {0:.5f}, valid_accuracy: {1:.2%}".format(self.stats['valid'].losses[-1], self.stats['valid'].accuracies[-1])
@@ -191,6 +203,10 @@ class BaseTrainer():
         for k in self.stats:
             obj[k] = self.stats[k].get_stats()
         return obj
+    
+    def pop_back_stats(self):
+        for k in self.stats:
+            self.stats[k].pop_back()
 
     def get_best_models(self):
         obj = {}

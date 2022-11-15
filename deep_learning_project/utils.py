@@ -42,6 +42,10 @@ class ModelStats():
     def get_best_model(self):
         return self.best_model
 
+    def pop_back(self):
+        self.losses.pop()
+        self.accuracies.pop()
+
 class Exporter():
     def __init__(self) -> None:
         pass
