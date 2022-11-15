@@ -40,8 +40,7 @@ class BaseTrainer():
             self.checkpoints_path = os.path.join(checkpoints_path, 'checkpoints')
             os.makedirs(self.checkpoints_path, exist_ok=True)
         
-    def fit(self, train_loader, valid_loader, test_loader, epochs, device):
-        self._reset_stats()
+    def fit(self, train_loader, valid_loader, test_loader, epochs, device, verbose=True):
         self.model.train()
         torch.backends.cudnn.benchmark = True
         self.current_epoch = 0
@@ -84,7 +83,7 @@ class BaseTrainer():
             if self.save_checkpoint:
                 torch.save(checkpoint, os.path.join(self.checkpoints_path, 'checkpoint_' + str(t) + '.pt'))
             
-            if not self.tunning:
+            if not self.tunning or verbose:
                 self._print_evaluation(valid_loader, test_loader)
             self.current_epoch += 1
 

@@ -23,11 +23,23 @@ def get_augmented_transform():
 
 def get_both_transform():
     return transforms.Compose(
-    [transforms.Grayscale(),   # transforms to gray-scale (1 input channel)
-     transforms.ToTensor(),    # transforms to Torch tensor (needed for PyTorch)
-     transforms.Normalize(mean=(0.5,),std=(0.5,)), # subtracts mean (0.5) and devides by standard deviation (0.5) -> resulting values in (-1, +1)
-     transforms.RandomHorizontalFlip(),
-     transforms.RandomRotation(degrees=(0, 359)),
+    [
+        transforms.Grayscale(),   # transforms to gray-scale (1 input channel)
+        transforms.ToTensor(),    # transforms to Torch tensor (needed for PyTorch)
+        transforms.Normalize(mean=(0.5,),std=(0.5,)), # subtracts mean (0.5) and devides by standard deviation (0.5) -> resulting values in (-1, +1)
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(degrees=(0, 359)),
+        transforms.ToPILImage(),
+        transforms.RandomChoice([
+            transforms.ColorJitter(brightness=0.2, contrast=0.2),
+            transforms.RandomAutocontrast(0.5), 
+            transforms.RandomAdjustSharpness(2, 0.5), 
+            transforms.RandomEqualize(0.5), 
+            transforms.RandomPosterize(2, 0.2),
+            transforms.RandomSolarize(192.0, 0.2),
+            transforms.RandomInvert(0.2),
+        ]),
+        transforms.ToTensor(),
      ]) # subtracts mean (0.5) and devides by standard deviation (0.5) -> resulting values in (-1, +1)
 
 current_absolute_path = os.path.dirname(__file__)
