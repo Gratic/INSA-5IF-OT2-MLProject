@@ -40,19 +40,25 @@ class BaseTrainer():
             self.checkpoints_path = os.path.join(checkpoints_path, 'checkpoints')
             os.makedirs(self.checkpoints_path, exist_ok=True)
         
-    def fit(self, train_loader, valid_loader, test_loader, min_epochs=None, max_epochs=10, device='cpu', verbose=True):
+    def fit(self, train_loader, valid_loader=None, test_loader=None, min_epochs=None, max_epochs=10, early_stopping=None, device='cpu', verbose=True):
         self.model.train()
         torch.backends.cudnn.benchmark = True
         self.current_epoch = 0
         self.max_epochs = max_epochs
         self.min_epochs = min_epochs
+        self.early_stopping = early_stopping
         self.device = device
         
         last_checkpoint = None
 
-        early_stopping = False
-        if self.min_epochs != None:
-            early_stopping = True
+        assert early_stopping in [None, 'train', 'test', 'valid'], "Early stopping must evaluate to None, train, test, or valid."
+        
+        if early_stopping == 'test':
+            assert test_loader != None, "Early stopping evaluate to test, but there is no test_loader."
+        
+        if early_stopping == 'valid':
+            assert valid_loader != None, "Early stopping evaluate to valid, but there is no valid_loader."
+
 
         # can't rely on dataset size when using a subset sampler
         self._count_data_from_all_loaders_and_load_to_device(train_loader, valid_loader, test_loader)
@@ -90,7 +96,7 @@ class BaseTrainer():
             if not self.tunning or verbose:
                 self._print_evaluation(valid_loader, test_loader)
 
-            if early_stopping and self.stats['valid'].losses[-1] > self.stats['valid'].best_loss:
+            if self.early_stopping != None and self.stats[self.early_stopping].losses[-1] > self.stats[self.early_stopping].best_loss:
                 self.pop_back_stats()
                 break
             elif self.save_checkpoint:
