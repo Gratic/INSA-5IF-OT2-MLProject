@@ -1,4 +1,3 @@
-from pure_eval import Evaluator
 import torch
 import os
 from .utils import ModelStats
@@ -25,6 +24,7 @@ class BaseTrainer():
         self.test_size = 0
         self.test_num_batch = 0
 
+        self.runned_epoch = 0
         self.current_epoch = 0
         self.max_epochs = None
         self.device = None
@@ -47,6 +47,7 @@ class BaseTrainer():
         self.min_epochs = min_epochs
         self.early_stopping = early_stopping
         self.device = device
+        self.current_epoch = 0
         
         last_checkpoint = None
 
@@ -70,7 +71,7 @@ class BaseTrainer():
                 checkpoint = torch.load(path)
                 self.model.load_state_dict(checkpoint["model_state_dict"])
                 self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-                self.current_epoch = checkpoint["epoch"]
+                self.runned_epoch = checkpoint["epoch"]
 
         for t in range(max_epochs):
             self._train_loop(train_loader, device)
@@ -92,10 +93,10 @@ class BaseTrainer():
                 session.report({"loss":self.stats['valid'].losses[-1], "accuracy":self.stats['valid'].accuracies[-1]})
                 # session.report({"loss":self.stats['valid'].losses[-1], "accuracy":self.stats['valid'].accuracies[-1]}, checkpoint=Checkpoint.from_directory(self.checkpoints_path))
 
-            if not self.tunning or verbose:
+            if not self.tunning and verbose:
                 self._print_evaluation(valid_loader, test_loader)
 
-            if self.early_stopping != None and self.stats[self.early_stopping].losses[-1] > self.stats[self.early_stopping].best_loss:
+            if self.current_epoch >= self.min_epochs - 1 and self.early_stopping != None and self.stats[self.early_stopping].losses[-1] > self.stats[self.early_stopping].best_loss:
                 self.pop_back_stats()
                 break
             elif self.save_checkpoint:
@@ -103,6 +104,7 @@ class BaseTrainer():
                 torch.save(checkpoint, os.path.join(self.checkpoints_path, last_checkpoint))
             
             self.current_epoch += 1
+            self.runned_epoch += 1
 
         torch.backends.cudnn.benchmark = False
 
@@ -148,6 +150,7 @@ class BaseTrainer():
 
             # Compute prediction and loss
             pred = self.model(X)
+            pred = pred.reshape((X.shape[0], 2))
             loss = self.loss_fn(pred, y)
 
             # Backpropagation
@@ -161,7 +164,7 @@ class BaseTrainer():
         train_loss /= num_batches
         accuracy /= size
 
-        self.stats['train'].add(self.current_epoch, self.model, train_loss, accuracy)
+        self.stats['train'].add(self.runned_epoch, self.model, train_loss, accuracy)
 
     def _evaluate_model(self, dataloader, size, num_batches, device):
         loss, accuracy = 0, 0
@@ -171,6 +174,7 @@ class BaseTrainer():
                 X = X.to(device)
                 y = y.to(device)
                 pred = self.model(X)
+                pred = pred.reshape((X.shape[0], 2))
                 loss += self.loss_fn(pred, y).item()
                 accuracy += (pred.argmax(1) == y).type(torch.float).sum().item()
 
@@ -186,7 +190,7 @@ class BaseTrainer():
 
         loss, accuracy = self._evaluate_model(dataloader, self.valid_size, self.valid_num_batch, device)
 
-        self.stats['valid'].add(self.current_epoch, self.model, loss, accuracy)
+        self.stats['valid'].add(self.runned_epoch, self.model, loss, accuracy)
     
     def _test_loop(self, dataloader, device):
         if dataloader == None:
@@ -197,7 +201,7 @@ class BaseTrainer():
 
         loss, accuracy = self._evaluate_model(dataloader, size, num_batches, device)
 
-        self.stats['test'].add(self.current_epoch, self.model, loss, accuracy)
+        self.stats['test'].add(self.runned_epoch, self.model, loss, accuracy)
     
     def _reset_stats(self):
         for stat in self.stats.values():
