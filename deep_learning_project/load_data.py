@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 from .torchsampler import ImbalancedDatasetSampler
 from typing import Any, Callable, cast, Dict, List, Optional, Tuple
 from torchvision import get_image_backend
+from torch.utils.data import TensorDataset
 
 def get_transform():
     return transforms.Compose(
